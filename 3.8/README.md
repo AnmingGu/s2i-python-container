@@ -106,17 +106,46 @@ To use the Source-to-Image scripts and build an image using a Dockerfile, create
 
 ```
 FROM registry.access.redhat.com/ubi8/python-38
+
 # Add application sources to a directory that the assemble script expects them
 # and set permissions so that the container runs without root access
 USER 0
 ADD app-src /tmp/src
 RUN chown -R 1001:0 /tmp/src
 USER 1001
+
 # Install the dependencies
 RUN /usr/libexec/s2i/assemble
+
 # Set the default command for the resulting image
 CMD /usr/libexec/s2i/run
 ```
+
+If you decide not to use the Source-to-Image scripts, you will need to manually tailor the Dockerfile to your application and its needs.
+Example Dockerfile for a simple Django application:
+
+```
+FROM registry.access.redhat.com/ubi8/python-38
+
+# Add application sources
+ADD app-src .
+
+# Install the dependencies
+RUN pip install -U "pip>=19.3.1" && \
+    pip install -r requirements.txt && \
+    python manage.py collectstatic --noinput && \
+    python manage.py migrate
+
+# Openshift runs containers with randomized UIDs
+# so the application's files needs to be writable
+# for group 0. Feel free to remove this line and/or
+# set up the access rights as you need.
+RUN /usr/bin/fix-permissions ./
+
+# Run the application
+CMD python manage.py runserver 0.0.0.0:8080
+```
+
 #### 4. Build a new image from a Dockerfile prepared in the previous step
 
 ```
